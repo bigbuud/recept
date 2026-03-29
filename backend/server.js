@@ -114,15 +114,16 @@ app.post('/api/recipes', (req, res) => {
   const {
     title, description = '', category = 'algemeen',
     tags = [], ingredients = [], instructions = '',
-    prep_time = 0, cook_time = 0, servings = 4
+    prep_time = 0, cook_time = 0, servings = 4,
+    image_path = null
   } = req.body;
 
   db.prepare(`
-    INSERT INTO recipes (id, title, description, category, tags, ingredients, instructions, prep_time, cook_time, servings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO recipes (id, title, description, category, tags, ingredients, instructions, prep_time, cook_time, servings, image_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, title, description, category,
     JSON.stringify(tags), JSON.stringify(ingredients),
-    instructions, prep_time, cook_time, servings);
+    instructions, prep_time, cook_time, servings, image_path);
 
   res.json({ id, success: true });
 });

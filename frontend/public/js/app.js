@@ -367,34 +367,55 @@ async function handleFileUpload(file) {
   }
 }
 
+let _uploadMode = 'image'; // 'image' | 'text'
+
+function setUploadMode(mode) {
+  _uploadMode = mode;
+  document.getElementById('mode-image-btn').classList.toggle('active', mode === 'image');
+  document.getElementById('mode-text-btn').classList.toggle('active', mode === 'text');
+  document.getElementById('upload-image-display').classList.toggle('hidden', mode === 'text');
+  document.getElementById('upload-text-mode').classList.toggle('hidden', mode === 'image');
+}
+
 async function showUploadPreview(result, filename, originalFile) {
   const preview = document.getElementById('upload-preview');
   const display = document.getElementById('upload-image-display');
 
+  // Bewaar result voor opslaan
+  preview._uploadResult = result;
+  preview._finalImagePath = null;
+
+  // Vul tekstveld altijd in (ook als mode=image)
+  document.getElementById('upload-text').value = result.extractedText || '';
+
+  // Toon/verberg mode-bar: alleen bij PDF zinvol (foto heeft geen tekst)
+  const isPdf = originalFile && originalFile.type === 'application/pdf';
+  document.getElementById('upload-mode-bar').style.display = isPdf ? 'flex' : 'none';
+
+  // Reset naar image-modus
+  setUploadMode('image');
+
   if (result.imagePath) {
-    // Direct image — toon meteen
+    // Directe afbeelding (jpg/png/webp)
     display.innerHTML = `<img src="${result.imagePath}" alt="Recept uitknipsel">`;
     preview._finalImagePath = result.imagePath;
-  } else if (originalFile && originalFile.type === 'application/pdf') {
-    // PDF — render eerste pagina naar canvas via PDF.js
-    display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon" style="animation:spinAnim 1s linear infinite">⏳</div><p>PDF laden…</p></div>`;
+  } else if (isPdf) {
+    // PDF → render eerste pagina client-side
+    display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon" style="animation:spinAnim 1s linear infinite">⏳</div><p>PDF renderen…</p></div>`;
     try {
       const imagePath = await renderPdfToImage(originalFile, result.filename);
       display.innerHTML = `<img src="${imagePath}" alt="PDF pagina 1">`;
       preview._finalImagePath = imagePath;
     } catch (e) {
       display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon">📄</div><p>${esc(filename)}</p></div>`;
-      preview._finalImagePath = null;
     }
   } else {
     display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon">📄</div><p>${esc(filename)}</p></div>`;
-    preview._finalImagePath = null;
   }
 
   const titleInput = document.getElementById('upload-title');
   titleInput.value = '';
   preview.classList.remove('hidden');
-  preview._uploadResult = result;
   setTimeout(() => titleInput.focus(), 150);
   titleInput.onkeydown = e => { if (e.key === 'Enter') saveUploadedRecipe(); };
 }
@@ -431,11 +452,12 @@ async function renderPdfToImage(file, serverFilename) {
 }
 
 async function saveUploadedRecipe() {
-  const title = document.getElementById('upload-title').value.trim();
+  const titleEl = document.getElementById('upload-title');
+  const title = titleEl.value.trim();
   if (!title) {
-    document.getElementById('upload-title').focus();
-    document.getElementById('upload-title').classList.add('shake');
-    setTimeout(() => document.getElementById('upload-title').classList.remove('shake'), 400);
+    titleEl.focus();
+    titleEl.classList.add('shake');
+    setTimeout(() => titleEl.classList.remove('shake'), 400);
     return;
   }
 
@@ -445,7 +467,9 @@ async function saveUploadedRecipe() {
   const body = {
     title,
     category: 'algemeen',
-    instructions: '',
+    instructions: _uploadMode === 'text'
+      ? (document.getElementById('upload-text').value || '')
+      : '',
     ingredients: [],
     description: '',
     tags: [],
@@ -453,7 +477,10 @@ async function saveUploadedRecipe() {
     source_file: result.filename
   };
 
-  if (preview._finalImagePath) body.image_path = preview._finalImagePath;
+  // Afbeelding alleen opslaan in image-modus
+  if (_uploadMode === 'image' && preview._finalImagePath) {
+    body.image_path = preview._finalImagePath;
+  }
 
   try {
     const r = await apiFetch('/api/recipes', 'POST', body);
@@ -470,8 +497,10 @@ function resetUpload() {
   document.getElementById('upload-progress').classList.add('hidden');
   document.getElementById('upload-preview').classList.add('hidden');
   document.getElementById('upload-image-display').innerHTML = '';
+  document.getElementById('upload-text').value = '';
   document.getElementById('file-input').value = '';
   uploadedFile = null;
+  _uploadMode = 'image';
 }
 
 // ── ADD / EDIT FORM ───────────────────────────────────

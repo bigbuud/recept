@@ -171,7 +171,18 @@
             <p id="progress-text">Uploaden…</p>
           </div>
           <div id="upload-preview" class="upload-preview hidden">
+            <!-- Modus-keuze -->
+            <div id="upload-mode-bar" class="upload-mode-bar">
+              <button class="mode-btn active" id="mode-image-btn" onclick="setUploadMode('image')">🖼️ Bewaar als afbeelding</button>
+              <button class="mode-btn" id="mode-text-btn" onclick="setUploadMode('text')">📝 Extraheer tekst</button>
+            </div>
+            <!-- Afbeelding preview -->
             <div id="upload-image-display" class="upload-image-display"></div>
+            <!-- Tekst modus -->
+            <div id="upload-text-mode" class="hidden">
+              <textarea id="upload-text" class="upload-textarea" rows="12" placeholder="Geëxtraheerde tekst…"></textarea>
+            </div>
+            <!-- Titel + opslaan -->
             <div class="upload-title-bar">
               <input type="text" id="upload-title" class="upload-title-input" placeholder="Naam van het recept…" autocomplete="off">
               <div class="upload-title-actions">
