@@ -781,7 +781,10 @@ async function viewRecipe(id) {
     const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
 
     const thumbHtml = r.image_path
-      ? `<div class="detail-image"><img src="${r.image_path}" alt="${esc(r.title)}"></div>`
+      ? `<div class="detail-image">
+           <img src="${r.image_path}" alt="${esc(r.title)}" onclick="openLightbox('${r.image_path}')">
+           <span class="zoom-hint">🔍 Klik om te vergroten</span>
+         </div>`
       : `<div class="detail-image">${cat ? cat.icon : '🍽️'}</div>`;
 
     const tagsHtml = (r.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
@@ -892,4 +895,31 @@ function esc(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ── LIGHTBOX ──────────────────────────────────────────
+let _lbRotation = 0;
+
+function openLightbox(src) {
+  _lbRotation = 0;
+  const lb  = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img');
+  img.src = src;
+  img.style.transform = 'rotate(0deg)';
+  lb.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  // sluit met Escape
+  document.onkeydown = e => { if (e.key === 'Escape') closeLightbox(); };
+}
+
+function closeLightbox(e) {
+  if (e && e.target === document.getElementById('lightbox-img')) return;
+  document.getElementById('lightbox').classList.add('hidden');
+  document.body.style.overflow = '';
+  document.onkeydown = null;
+}
+
+function lbRotate(deg) {
+  _lbRotation = (_lbRotation + deg + 360) % 360;
+  document.getElementById('lightbox-img').style.transform = `rotate(${_lbRotation}deg)`;
 }

@@ -288,6 +288,14 @@
     </div>
   </div>
 
+  <!-- Lightbox -->
+  <div id="lightbox" class="hidden" onclick="closeLightbox(event)">
+    <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightbox-img" src="" alt="">
+    <button id="lightbox-rotate-l" onclick="lbRotate(-90); event.stopPropagation()">↺</button>
+    <button id="lightbox-rotate-r" onclick="lbRotate(90);  event.stopPropagation()">↻</button>
+  </div>
+
   <script src="/js/app.js"></script>
 </body>
 </html>
