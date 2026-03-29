@@ -358,7 +358,7 @@ async function handleFileUpload(file) {
 
     setTimeout(() => {
       progressEl.classList.add('hidden');
-      showUploadPreview(result, file.name);
+      showUploadPreview(result, file.name, file);
     }, 400);
   } catch (err) {
     progressEl.classList.add('hidden');
@@ -367,31 +367,67 @@ async function handleFileUpload(file) {
   }
 }
 
-function showUploadPreview(result, filename) {
+async function showUploadPreview(result, filename, originalFile) {
   const preview = document.getElementById('upload-preview');
   const display = document.getElementById('upload-image-display');
 
-  // Show image or PDF placeholder
   if (result.imagePath) {
+    // Direct image — toon meteen
     display.innerHTML = `<img src="${result.imagePath}" alt="Recept uitknipsel">`;
+    preview._finalImagePath = result.imagePath;
+  } else if (originalFile && originalFile.type === 'application/pdf') {
+    // PDF — render eerste pagina naar canvas via PDF.js
+    display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon" style="animation:spinAnim 1s linear infinite">⏳</div><p>PDF laden…</p></div>`;
+    try {
+      const imagePath = await renderPdfToImage(originalFile, result.filename);
+      display.innerHTML = `<img src="${imagePath}" alt="PDF pagina 1">`;
+      preview._finalImagePath = imagePath;
+    } catch (e) {
+      display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon">📄</div><p>${esc(filename)}</p></div>`;
+      preview._finalImagePath = null;
+    }
   } else {
-    // PDF — show first-page placeholder
-    display.innerHTML = `
-      <div class="pdf-placeholder">
-        <div class="pdf-icon">📄</div>
-        <p>${esc(filename)}</p>
-      </div>`;
+    display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon">📄</div><p>${esc(filename)}</p></div>`;
+    preview._finalImagePath = null;
   }
 
-  // Clear title field, focus it
   const titleInput = document.getElementById('upload-title');
   titleInput.value = '';
   preview.classList.remove('hidden');
   preview._uploadResult = result;
-  setTimeout(() => titleInput.focus(), 100);
-
-  // Enter key saves
+  setTimeout(() => titleInput.focus(), 150);
   titleInput.onkeydown = e => { if (e.key === 'Enter') saveUploadedRecipe(); };
+}
+
+async function renderPdfToImage(file, serverFilename) {
+  // Laad PDF.js dynamisch
+  if (!window.pdfjsLib) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+
+  const viewport = page.getViewport({ scale: 2.0 }); // hoge resolutie
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+  // Canvas → blob → upload als PNG
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+  const formData = new FormData();
+  formData.append('file', new File([blob], serverFilename.replace(/\.pdf$/i, '_p1.jpg'), { type: 'image/jpeg' }));
+  const r = await fetch('/api/upload', { method: 'POST', body: formData }).then(r => r.json());
+  return r.imagePath;
 }
 
 async function saveUploadedRecipe() {
@@ -409,7 +445,7 @@ async function saveUploadedRecipe() {
   const body = {
     title,
     category: 'algemeen',
-    instructions: result.extractedText || '',
+    instructions: '',
     ingredients: [],
     description: '',
     tags: [],
@@ -417,7 +453,7 @@ async function saveUploadedRecipe() {
     source_file: result.filename
   };
 
-  if (result.imagePath) body.image_path = result.imagePath;
+  if (preview._finalImagePath) body.image_path = preview._finalImagePath;
 
   try {
     const r = await apiFetch('/api/recipes', 'POST', body);
