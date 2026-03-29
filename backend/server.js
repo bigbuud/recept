@@ -169,18 +169,23 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   let imagePath = null;
 
   try {
-    if (ext === '.pdf') {
-      const pdfParse = require('pdf-parse');
-      const buffer = fs.readFileSync(filePath);
-      const data = await pdfParse(buffer);
-      extractedText = data.text;
+    if (['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+      // Direct image upload — this is the primary use case
+      imagePath = `/uploads/${req.file.filename}`;
+    } else if (ext === '.pdf') {
+      // For PDF: try to convert first page to image via sharp if possible,
+      // otherwise just store the PDF path as a "document" reference
+      imagePath = null; // Will show PDF placeholder in UI
+      try {
+        const pdfParse = require('pdf-parse');
+        const buffer = fs.readFileSync(filePath);
+        const data = await pdfParse(buffer);
+        extractedText = data.text.slice(0, 2000); // Keep some text for reference
+      } catch (e) { /* ignore */ }
     } else if (ext === '.docx') {
       const mammoth = require('mammoth');
       const result = await mammoth.extractRawText({ path: filePath });
-      extractedText = result.value;
-    } else if (['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
-      imagePath = `/uploads/${req.file.filename}`;
-      extractedText = '(afbeelding geüpload — voeg details handmatig toe)';
+      extractedText = result.value.slice(0, 2000);
     }
 
     res.json({

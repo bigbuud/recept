@@ -156,45 +156,30 @@
       <section id="page-upload" class="page">
         <header class="page-header">
           <h1>📤 Recept uploaden</h1>
-          <p class="subtitle">PDF, Word-document of foto</p>
+          <p class="subtitle">Foto of PDF uitknipsel — geef enkel een naam</p>
         </header>
         <div class="upload-container">
           <div id="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
-            <div class="drop-icon">📁</div>
-            <h3>Sleep een bestand hierheen</h3>
+            <div class="drop-icon">🖼️</div>
+            <h3>Sleep je uitknipsel hierheen</h3>
             <p>of klik om te bladeren</p>
-            <p class="file-types">PDF • DOCX • JPG • PNG</p>
-            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.webp" hidden>
+            <p class="file-types">JPG • PNG • WEBP • PDF</p>
+            <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif" hidden>
           </div>
           <div id="upload-progress" class="upload-progress hidden">
             <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
-            <p id="progress-text">Bestand verwerken…</p>
+            <p id="progress-text">Uploaden…</p>
           </div>
           <div id="upload-preview" class="upload-preview hidden">
-            <div class="preview-header">
-              <span id="preview-filename" class="preview-filename"></span>
-              <button class="btn-sm" onclick="resetUpload()">Opnieuw</button>
+            <div id="upload-image-display" class="upload-image-display"></div>
+            <div class="upload-title-bar">
+              <input type="text" id="upload-title" class="upload-title-input" placeholder="Naam van het recept…" autocomplete="off">
+              <div class="upload-title-actions">
+                <button class="btn-sm" onclick="resetUpload()">✕</button>
+                <button class="btn-primary" onclick="saveUploadedRecipe()">✅ Opslaan</button>
+              </div>
             </div>
-            <div id="preview-image-wrap" class="preview-image-wrap hidden">
-              <img id="preview-image" src="" alt="Recept foto">
-            </div>
-            <div class="form-group">
-              <label>Titel *</label>
-              <input type="text" id="upload-title" placeholder="Naam van het recept">
-            </div>
-            <div class="form-group">
-              <label>Categorie</label>
-              <select id="upload-category"></select>
-            </div>
-            <div class="form-group">
-              <label>Geëxtraheerde tekst (bewerk naar wens)</label>
-              <textarea id="upload-text" rows="8" placeholder="Tekst uit het document…"></textarea>
-            </div>
-            <div class="form-group">
-              <label>Ingrediënten (één per regel)</label>
-              <textarea id="upload-ingredients" rows="5" placeholder="200g bloem&#10;2 eieren&#10;…"></textarea>
-            </div>
-            <button class="btn-primary full-width" onclick="saveUploadedRecipe()">✅ Recept opslaan</button>
+            <input type="hidden" id="upload-category" value="algemeen">
           </div>
         </div>
       </section>

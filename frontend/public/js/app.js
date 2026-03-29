@@ -347,7 +347,7 @@ async function handleFileUpload(file) {
     const interval = setInterval(() => {
       prog = Math.min(prog + Math.random() * 20, 85);
       fill.style.width = prog + '%';
-      txt.textContent = prog < 40 ? 'Bestand uploaden…' : prog < 70 ? 'Tekst extracten…' : 'Bijna klaar…';
+      txt.textContent = prog < 60 ? 'Uploaden…' : 'Bijna klaar…';
     }, 200);
 
     const result = await fetch('/api/upload', { method: 'POST', body: formData }).then(r => r.json());
@@ -369,38 +369,48 @@ async function handleFileUpload(file) {
 
 function showUploadPreview(result, filename) {
   const preview = document.getElementById('upload-preview');
-  document.getElementById('preview-filename').textContent = filename;
+  const display = document.getElementById('upload-image-display');
 
+  // Show image or PDF placeholder
   if (result.imagePath) {
-    document.getElementById('preview-image-wrap').classList.remove('hidden');
-    document.getElementById('preview-image').src = result.imagePath;
+    display.innerHTML = `<img src="${result.imagePath}" alt="Recept uitknipsel">`;
+  } else {
+    // PDF — show first-page placeholder
+    display.innerHTML = `
+      <div class="pdf-placeholder">
+        <div class="pdf-icon">📄</div>
+        <p>${esc(filename)}</p>
+      </div>`;
   }
 
-  // Try to auto-extract a title from filename
-  const guessTitle = filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-  document.getElementById('upload-title').value = guessTitle;
-  document.getElementById('upload-text').value = result.extractedText || '';
-
+  // Clear title field, focus it
+  const titleInput = document.getElementById('upload-title');
+  titleInput.value = '';
   preview.classList.remove('hidden');
   preview._uploadResult = result;
+  setTimeout(() => titleInput.focus(), 100);
+
+  // Enter key saves
+  titleInput.onkeydown = e => { if (e.key === 'Enter') saveUploadedRecipe(); };
 }
 
 async function saveUploadedRecipe() {
   const title = document.getElementById('upload-title').value.trim();
-  if (!title) { showToast('Voeg een titel toe', 'error'); return; }
+  if (!title) {
+    document.getElementById('upload-title').focus();
+    document.getElementById('upload-title').classList.add('shake');
+    setTimeout(() => document.getElementById('upload-title').classList.remove('shake'), 400);
+    return;
+  }
 
   const preview = document.getElementById('upload-preview');
   const result = preview._uploadResult;
-  const instrText = document.getElementById('upload-text').value;
-  const ingredRaw = document.getElementById('upload-ingredients').value;
-  const ingredients = ingredRaw.split('\n').map(s => s.trim()).filter(Boolean);
-  const category = document.getElementById('upload-category').value;
 
   const body = {
     title,
-    category,
-    instructions: instrText,
-    ingredients,
+    category: 'algemeen',
+    instructions: result.extractedText || '',
+    ingredients: [],
     description: '',
     tags: [],
     source_type: result.sourceType,
@@ -413,7 +423,7 @@ async function saveUploadedRecipe() {
     const r = await apiFetch('/api/recipes', 'POST', body);
     showToast('Recept opgeslagen! 🎉', 'success');
     resetUpload();
-    navigate('home');
+    viewRecipe(r.id);
   } catch {
     showToast('Opslaan mislukt', 'error');
   }
@@ -423,7 +433,7 @@ function resetUpload() {
   document.getElementById('drop-zone').classList.remove('hidden');
   document.getElementById('upload-progress').classList.add('hidden');
   document.getElementById('upload-preview').classList.add('hidden');
-  document.getElementById('preview-image-wrap').classList.add('hidden');
+  document.getElementById('upload-image-display').innerHTML = '';
   document.getElementById('file-input').value = '';
   uploadedFile = null;
 }

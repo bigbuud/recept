@@ -572,11 +572,61 @@ h1, h2, h3 { font-family: 'Playfair Display', serif; }
 .progress-fill { height: 100%; background: var(--orange); border-radius: 50px; transition: width 0.4s; width: 0%; }
 #progress-text { font-size: 13px; color: var(--text-muted); text-align: center; }
 
-.upload-preview { margin-top: 20px; }
-.preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.preview-filename { font-weight: 700; color: var(--text); font-size: 14px; }
-.preview-image-wrap { margin-bottom: 16px; border-radius: var(--radius-sm); overflow: hidden; max-height: 200px; }
-.preview-image-wrap img { width: 100%; height: 200px; object-fit: cover; }
+/* ── UPLOAD PREVIEW — image-first ── */
+.upload-preview { margin-top: 20px; animation: fadeUp 0.3s ease both; }
+
+.upload-image-display {
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--sand);
+  position: relative;
+  margin-bottom: 0;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-image-display img {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+  border-radius: var(--radius);
+}
+.upload-image-display .pdf-placeholder {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.upload-image-display .pdf-placeholder .pdf-icon { font-size: 56px; margin-bottom: 12px; }
+.upload-image-display .pdf-placeholder p { font-size: 14px; font-weight: 600; }
+
+.upload-title-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  border-radius: 50px;
+  padding: 6px 6px 6px 20px;
+  transition: border-color var(--transition);
+}
+.upload-title-bar:focus-within { border-color: var(--orange); }
+.upload-title-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  padding: 6px 0;
+}
+.upload-title-input::placeholder { color: var(--text-light); font-weight: 400; }
+.upload-title-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
 /* ── FORMS ──────────────────────────────────────────── */
 .recipe-form, .upload-preview { display: flex; flex-direction: column; gap: 16px; }
@@ -738,6 +788,15 @@ h1, h2, h3 { font-family: 'Playfair Display', serif; }
 
 /* ── UTILITIES ──────────────────────────────────────── */
 .hidden { display: none !important; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-8px); }
+  40%       { transform: translateX(8px); }
+  60%       { transform: translateX(-5px); }
+  80%       { transform: translateX(5px); }
+}
+.shake { animation: shake 0.4s ease; border-color: var(--red) !important; }
 
 /* ── MOBILE ─────────────────────────────────────────── */
 @media (max-width: 768px) {
