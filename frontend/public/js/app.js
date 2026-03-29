@@ -453,15 +453,11 @@ async function loadPdfJs() {
 }
 
 // ── PDF PAGINA RENDEREN ───────────────────────────────
-async function renderPdfPage(pageNum) {
-  _pdfCurPage = pageNum;
-  const display = document.getElementById('upload-image-display');
-  const toolbar = document.getElementById('image-toolbar');
-  const label   = document.getElementById('pdf-page-label');
+// _pdfPageCanvases = full-res (scale 2.0) — voor opslaan
+// _pdfThumbCanvases = low-res (scale 0.4) — enkel voor thumbnails
+let _pdfThumbCanvases = {};
 
-  label.textContent = `Pagina ${pageNum} / ${_pdfPageCount}`;
-
-  // Render naar canvas (gecached)
+async function renderPdfPageFull(pageNum) {
   if (!_pdfPageCanvases[pageNum]) {
     const page     = await _pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2.0 });
@@ -471,8 +467,32 @@ async function renderPdfPage(pageNum) {
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     _pdfPageCanvases[pageNum] = canvas;
   }
+  return _pdfPageCanvases[pageNum];
+}
 
-  const canvas = _pdfPageCanvases[pageNum];
+async function renderPdfPageThumb(pageNum) {
+  if (!_pdfThumbCanvases[pageNum]) {
+    const page     = await _pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 0.4 });
+    const canvas   = document.createElement('canvas');
+    canvas.width   = viewport.width;
+    canvas.height  = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    _pdfThumbCanvases[pageNum] = canvas;
+  }
+  return _pdfThumbCanvases[pageNum];
+}
+
+async function renderPdfPage(pageNum) {
+  _pdfCurPage = pageNum;
+  const display = document.getElementById('upload-image-display');
+  const toolbar = document.getElementById('image-toolbar');
+  const label   = document.getElementById('pdf-page-label');
+
+  label.textContent = `Pagina ${pageNum} / ${_pdfPageCount}`;
+
+  const canvas = await renderPdfPageFull(pageNum);
+
   display.innerHTML = '';
   const img = document.createElement('img');
   img.id  = 'preview-img';
@@ -481,7 +501,7 @@ async function renderPdfPage(pageNum) {
   img.style.transform = `rotate(${_imageRotation}deg)`;
   display.appendChild(img);
   toolbar.classList.remove('hidden');
-  _imageRotation = 0; // reset rotatie bij pagina-wissel
+  _imageRotation = 0;
 }
 
 // ── PDF NAVIGATIE ─────────────────────────────────────
@@ -502,28 +522,20 @@ async function togglePageSelect(on) {
   }
   grid.classList.remove('hidden');
   grid.innerHTML = '';
-  _selectedPages = new Set([_pdfCurPage]);
+  // Standaard: alle pagina's geselecteerd
+  _selectedPages = new Set(Array.from({length: _pdfPageCount}, (_, i) => i + 1));
 
   for (let p = 1; p <= _pdfPageCount; p++) {
-    // Zorg dat canvas gecached is
-    if (!_pdfPageCanvases[p]) {
-      const page     = await _pdfDoc.getPage(p);
-      const viewport = page.getViewport({ scale: 0.5 });
-      const canvas   = document.createElement('canvas');
-      canvas.width   = viewport.width;
-      canvas.height  = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      _pdfPageCanvases[p] = canvas;
-    }
+    const thumbCanvas = await renderPdfPageThumb(p);
 
     const thumb = document.createElement('div');
-    thumb.className = 'pdf-thumb' + (p === _pdfCurPage ? ' selected' : '');
+    thumb.className = 'pdf-thumb selected'; // allen standaard aan
     thumb.dataset.page = p;
 
     const tCanvas = document.createElement('canvas');
-    tCanvas.width  = _pdfPageCanvases[p].width;
-    tCanvas.height = _pdfPageCanvases[p].height;
-    tCanvas.getContext('2d').drawImage(_pdfPageCanvases[p], 0, 0);
+    tCanvas.width  = thumbCanvas.width;
+    tCanvas.height = thumbCanvas.height;
+    tCanvas.getContext('2d').drawImage(thumbCanvas, 0, 0);
 
     const check = document.createElement('div');
     check.className = 'pdf-thumb-check';
@@ -607,17 +619,9 @@ async function saveUploadedRecipe() {
         // PDF: geselecteerde pagina('s) samenvoegen tot één lange afbeelding
         const pages = Array.from(_selectedPages).sort((a, b) => a - b);
 
-        // Zorg dat alle pagina's op volle resolutie gecached zijn
+        // Altijd full-res renderen voor opslaan
         for (const p of pages) {
-          if (!_pdfPageCanvases[p] || _pdfPageCanvases[p].width < 200) {
-            const page     = await _pdfDoc.getPage(p);
-            const viewport = page.getViewport({ scale: 2.0 });
-            const canvas   = document.createElement('canvas');
-            canvas.width   = viewport.width;
-            canvas.height  = viewport.height;
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-            _pdfPageCanvases[p] = canvas;
-          }
+          await renderPdfPageFull(p);
         }
 
         if (pages.length === 1) {
@@ -695,6 +699,7 @@ function resetUpload() {
   _uploadMode = 'image';
   _pdfDoc = null;
   _pdfPageCanvases = {};
+  _pdfThumbCanvases = {};
   _imageRotation = 0;
   _selectedPages = new Set();
 }
@@ -907,13 +912,17 @@ function openLightbox(src) {
   img.src = src;
   img.style.transform = 'rotate(0deg)';
   lb.classList.remove('hidden');
+  // Scroll naar top bij openen
+  document.getElementById('lightbox-scroll').scrollTop = 0;
+  lb.scrollTop = 0;
   document.body.style.overflow = 'hidden';
-  // sluit met Escape
   document.onkeydown = e => { if (e.key === 'Escape') closeLightbox(); };
 }
 
 function closeLightbox(e) {
-  if (e && e.target === document.getElementById('lightbox-img')) return;
+  // Sluit enkel als je op de donkere achtergrond klikt (niet op de foto zelf)
+  if (e && (e.target === document.getElementById('lightbox-img') ||
+            e.target.closest('.lb-bottom-bar'))) return;
   document.getElementById('lightbox').classList.add('hidden');
   document.body.style.overflow = '';
   document.onkeydown = null;
@@ -921,5 +930,12 @@ function closeLightbox(e) {
 
 function lbRotate(deg) {
   _lbRotation = (_lbRotation + deg + 360) % 360;
-  document.getElementById('lightbox-img').style.transform = `rotate(${_lbRotation}deg)`;
+  const img = document.getElementById('lightbox-img');
+  img.style.transform = `rotate(${_lbRotation}deg)`;
+  // Bij 90/270° aanpassen zodat afbeelding niet buiten scherm valt
+  if (_lbRotation === 90 || _lbRotation === 270) {
+    img.style.maxWidth = '90vh';
+  } else {
+    img.style.maxWidth = 'min(100%, 1200px)';
+  }
 }
