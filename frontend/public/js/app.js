@@ -367,50 +367,69 @@ async function handleFileUpload(file) {
   }
 }
 
-let _uploadMode = 'image'; // 'image' | 'text'
+// ── UPLOAD STATE ─────────────────────────────────────
+let _uploadMode   = 'image';   // 'image' | 'text'
+let _pdfDoc       = null;       // PDF.js document
+let _pdfPageCount = 0;
+let _pdfCurPage   = 1;
+let _pdfPageCanvases = {};      // cache: pageNum → canvas
+let _imageRotation = 0;         // graden
+let _pageSelectMode = false;
+let _selectedPages = new Set(); // geselecteerde pagina-nummers
 
+// ── MODUS TOGGLE ──────────────────────────────────────
 function setUploadMode(mode) {
   _uploadMode = mode;
   document.getElementById('mode-image-btn').classList.toggle('active', mode === 'image');
   document.getElementById('mode-text-btn').classList.toggle('active', mode === 'text');
-  document.getElementById('upload-image-display').classList.toggle('hidden', mode === 'text');
+  document.getElementById('upload-image-wrap').classList.toggle('hidden', mode === 'text');
   document.getElementById('upload-text-mode').classList.toggle('hidden', mode === 'image');
 }
 
+// ── TOON PREVIEW ──────────────────────────────────────
 async function showUploadPreview(result, filename, originalFile) {
   const preview = document.getElementById('upload-preview');
-  const display = document.getElementById('upload-image-display');
-
-  // Bewaar result voor opslaan
   preview._uploadResult = result;
   preview._finalImagePath = null;
+  _imageRotation = 0;
+  _pdfDoc = null;
+  _pdfPageCount = 0;
+  _pdfCurPage = 1;
+  _pdfPageCanvases = {};
+  _selectedPages = new Set([1]);
+  _pageSelectMode = false;
 
-  // Vul tekstveld altijd in (ook als mode=image)
   document.getElementById('upload-text').value = result.extractedText || '';
+  document.getElementById('pdf-page-nav').classList.add('hidden');
+  document.getElementById('pdf-pages-grid').classList.add('hidden');
+  document.getElementById('page-select-check').checked = false;
 
-  // Toon/verberg mode-bar: alleen bij PDF zinvol (foto heeft geen tekst)
   const isPdf = originalFile && originalFile.type === 'application/pdf';
   document.getElementById('upload-mode-bar').style.display = isPdf ? 'flex' : 'none';
-
-  // Reset naar image-modus
   setUploadMode('image');
 
+  const display = document.getElementById('upload-image-display');
+  const toolbar = document.getElementById('image-toolbar');
+
   if (result.imagePath) {
-    // Directe afbeelding (jpg/png/webp)
-    display.innerHTML = `<img src="${result.imagePath}" alt="Recept uitknipsel">`;
+    // Foto
+    display.innerHTML = `<img id="preview-img" src="${result.imagePath}" alt="Recept">`;
     preview._finalImagePath = result.imagePath;
+    toolbar.classList.remove('hidden');
   } else if (isPdf) {
-    // PDF → render eerste pagina client-side
-    display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon" style="animation:spinAnim 1s linear infinite">⏳</div><p>PDF renderen…</p></div>`;
-    try {
-      const imagePath = await renderPdfToImage(originalFile, result.filename);
-      display.innerHTML = `<img src="${imagePath}" alt="PDF pagina 1">`;
-      preview._finalImagePath = imagePath;
-    } catch (e) {
-      display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon">📄</div><p>${esc(filename)}</p></div>`;
+    display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon" style="animation:spinAnim 1s linear infinite">⏳</div><p>PDF laden…</p></div>`;
+    toolbar.classList.add('hidden');
+    await loadPdfJs();
+    const arrayBuffer = await originalFile.arrayBuffer();
+    _pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    _pdfPageCount = _pdfDoc.numPages;
+    await renderPdfPage(1);
+    if (_pdfPageCount > 1) {
+      document.getElementById('pdf-page-nav').classList.remove('hidden');
     }
   } else {
     display.innerHTML = `<div class="pdf-placeholder"><div class="pdf-icon">📄</div><p>${esc(filename)}</p></div>`;
+    toolbar.classList.add('hidden');
   }
 
   const titleInput = document.getElementById('upload-title');
@@ -420,40 +439,155 @@ async function showUploadPreview(result, filename, originalFile) {
   titleInput.onkeydown = e => { if (e.key === 'Enter') saveUploadedRecipe(); };
 }
 
-async function renderPdfToImage(file, serverFilename) {
-  // Laad PDF.js dynamisch
-  if (!window.pdfjsLib) {
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// ── PDF.JS LADEN ──────────────────────────────────────
+async function loadPdfJs() {
+  if (window.pdfjsLib) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// ── PDF PAGINA RENDEREN ───────────────────────────────
+async function renderPdfPage(pageNum) {
+  _pdfCurPage = pageNum;
+  const display = document.getElementById('upload-image-display');
+  const toolbar = document.getElementById('image-toolbar');
+  const label   = document.getElementById('pdf-page-label');
+
+  label.textContent = `Pagina ${pageNum} / ${_pdfPageCount}`;
+
+  // Render naar canvas (gecached)
+  if (!_pdfPageCanvases[pageNum]) {
+    const page     = await _pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 2.0 });
+    const canvas   = document.createElement('canvas');
+    canvas.width   = viewport.width;
+    canvas.height  = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    _pdfPageCanvases[pageNum] = canvas;
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
+  const canvas = _pdfPageCanvases[pageNum];
+  display.innerHTML = '';
+  const img = document.createElement('img');
+  img.id  = 'preview-img';
+  img.src = canvas.toDataURL('image/jpeg', 0.92);
+  img.alt = `Pagina ${pageNum}`;
+  img.style.transform = `rotate(${_imageRotation}deg)`;
+  display.appendChild(img);
+  toolbar.classList.remove('hidden');
+  _imageRotation = 0; // reset rotatie bij pagina-wissel
+}
 
-  const viewport = page.getViewport({ scale: 2.0 }); // hoge resolutie
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+// ── PDF NAVIGATIE ─────────────────────────────────────
+async function pdfGoPage(delta) {
+  const next = _pdfCurPage + delta;
+  if (next < 1 || next > _pdfPageCount) return;
+  await renderPdfPage(next);
+}
 
-  // Canvas → blob → upload als PNG
-  const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
-  const formData = new FormData();
-  formData.append('file', new File([blob], serverFilename.replace(/\.pdf$/i, '_p1.jpg'), { type: 'image/jpeg' }));
-  const r = await fetch('/api/upload', { method: 'POST', body: formData }).then(r => r.json());
+// ── PAGINA SELECTIE (multi) ───────────────────────────
+async function togglePageSelect(on) {
+  _pageSelectMode = on;
+  const grid = document.getElementById('pdf-pages-grid');
+  if (!on) {
+    grid.classList.add('hidden');
+    _selectedPages = new Set([_pdfCurPage]);
+    return;
+  }
+  grid.classList.remove('hidden');
+  grid.innerHTML = '';
+  _selectedPages = new Set([_pdfCurPage]);
+
+  for (let p = 1; p <= _pdfPageCount; p++) {
+    // Zorg dat canvas gecached is
+    if (!_pdfPageCanvases[p]) {
+      const page     = await _pdfDoc.getPage(p);
+      const viewport = page.getViewport({ scale: 0.5 });
+      const canvas   = document.createElement('canvas');
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      _pdfPageCanvases[p] = canvas;
+    }
+
+    const thumb = document.createElement('div');
+    thumb.className = 'pdf-thumb' + (p === _pdfCurPage ? ' selected' : '');
+    thumb.dataset.page = p;
+
+    const tCanvas = document.createElement('canvas');
+    tCanvas.width  = _pdfPageCanvases[p].width;
+    tCanvas.height = _pdfPageCanvases[p].height;
+    tCanvas.getContext('2d').drawImage(_pdfPageCanvases[p], 0, 0);
+
+    const check = document.createElement('div');
+    check.className = 'pdf-thumb-check';
+    check.textContent = '✓';
+
+    const num = document.createElement('div');
+    num.className = 'pdf-thumb-num';
+    num.textContent = p;
+
+    thumb.appendChild(tCanvas);
+    thumb.appendChild(check);
+    thumb.appendChild(num);
+
+    thumb.onclick = () => {
+      if (_selectedPages.has(p)) {
+        if (_selectedPages.size === 1) return; // minstens 1 pagina
+        _selectedPages.delete(p);
+        thumb.classList.remove('selected');
+      } else {
+        _selectedPages.add(p);
+        thumb.classList.add('selected');
+      }
+    };
+    grid.appendChild(thumb);
+  }
+}
+
+// ── ROTEREN ───────────────────────────────────────────
+function rotateImage(deg) {
+  _imageRotation = (_imageRotation + deg + 360) % 360;
+  const img = document.getElementById('preview-img');
+  if (img) img.style.transform = `rotate(${_imageRotation}deg)`;
+}
+
+// ── CANVAS ROTEREN & UPLOADEN ─────────────────────────
+async function canvasToUploadedPath(canvas, rotation, serverFilename, suffix) {
+  let finalCanvas = canvas;
+  if (rotation !== 0) {
+    const rad = (rotation * Math.PI) / 180;
+    const sin = Math.abs(Math.sin(rad));
+    const cos = Math.abs(Math.cos(rad));
+    const w = Math.round(canvas.width * cos + canvas.height * sin);
+    const h = Math.round(canvas.width * sin + canvas.height * cos);
+    const rot = document.createElement('canvas');
+    rot.width  = w;
+    rot.height = h;
+    const ctx = rot.getContext('2d');
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+    finalCanvas = rot;
+  }
+  const blob = await new Promise(res => finalCanvas.toBlob(res, 'image/jpeg', 0.92));
+  const fname = serverFilename.replace(/\.[^.]+$/, `${suffix}.jpg`);
+  const fd = new FormData();
+  fd.append('file', new File([blob], fname, { type: 'image/jpeg' }));
+  const r = await fetch('/api/upload', { method: 'POST', body: fd }).then(r => r.json());
   return r.imagePath;
 }
 
+// ── OPSLAAN ───────────────────────────────────────────
 async function saveUploadedRecipe() {
   const titleEl = document.getElementById('upload-title');
-  const title = titleEl.value.trim();
+  const title   = titleEl.value.trim();
   if (!title) {
     titleEl.focus();
     titleEl.classList.add('shake');
@@ -462,45 +596,107 @@ async function saveUploadedRecipe() {
   }
 
   const preview = document.getElementById('upload-preview');
-  const result = preview._uploadResult;
-
-  const body = {
-    title,
-    category: 'algemeen',
-    instructions: _uploadMode === 'text'
-      ? (document.getElementById('upload-text').value || '')
-      : '',
-    ingredients: [],
-    description: '',
-    tags: [],
-    source_type: result.sourceType,
-    source_file: result.filename
-  };
-
-  // Afbeelding alleen opslaan in image-modus
-  if (_uploadMode === 'image' && preview._finalImagePath) {
-    body.image_path = preview._finalImagePath;
-  }
+  const result  = preview._uploadResult;
+  showSpinner(true);
 
   try {
+    let imagePath = null;
+
+    if (_uploadMode === 'image') {
+      if (_pdfDoc) {
+        // PDF: geselecteerde pagina('s) samenvoegen tot één lange afbeelding
+        const pages = Array.from(_selectedPages).sort((a, b) => a - b);
+
+        // Zorg dat alle pagina's op volle resolutie gecached zijn
+        for (const p of pages) {
+          if (!_pdfPageCanvases[p] || _pdfPageCanvases[p].width < 200) {
+            const page     = await _pdfDoc.getPage(p);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas   = document.createElement('canvas');
+            canvas.width   = viewport.width;
+            canvas.height  = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            _pdfPageCanvases[p] = canvas;
+          }
+        }
+
+        if (pages.length === 1) {
+          // Één pagina — met rotatie
+          imagePath = await canvasToUploadedPath(
+            _pdfPageCanvases[pages[0]], _imageRotation, result.filename, '_p' + pages[0]
+          );
+        } else {
+          // Meerdere pagina's — stapelen onder elkaar
+          const canvases = pages.map(p => _pdfPageCanvases[p]);
+          const maxW     = Math.max(...canvases.map(c => c.width));
+          const totalH   = canvases.reduce((s, c) => s + c.height, 0);
+          const merged   = document.createElement('canvas');
+          merged.width   = maxW;
+          merged.height  = totalH;
+          const ctx      = merged.getContext('2d');
+          let y = 0;
+          for (const c of canvases) { ctx.drawImage(c, 0, y); y += c.height; }
+          imagePath = await canvasToUploadedPath(merged, 0, result.filename, '_merged');
+        }
+      } else if (preview._finalImagePath) {
+        // Foto: rotatie verwerken
+        if (_imageRotation !== 0) {
+          const img = new Image();
+          img.src = preview._finalImagePath;
+          await new Promise(res => { img.onload = res; });
+          const c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          c.getContext('2d').drawImage(img, 0, 0);
+          imagePath = await canvasToUploadedPath(c, _imageRotation, result.filename, '_r');
+        } else {
+          imagePath = preview._finalImagePath;
+        }
+      }
+    }
+
+    const body = {
+      title,
+      category:     'algemeen',
+      instructions: _uploadMode === 'text'
+        ? (document.getElementById('upload-text').value || '')
+        : '',
+      ingredients:  [],
+      description:  '',
+      tags:         [],
+      source_type:  result.sourceType,
+      source_file:  result.filename,
+      image_path:   imagePath || null
+    };
+
     const r = await apiFetch('/api/recipes', 'POST', body);
     showToast('Recept opgeslagen! 🎉', 'success');
     resetUpload();
     viewRecipe(r.id);
-  } catch {
+  } catch (e) {
+    console.error(e);
     showToast('Opslaan mislukt', 'error');
+  } finally {
+    showSpinner(false);
   }
 }
 
+// ── RESET ─────────────────────────────────────────────
 function resetUpload() {
   document.getElementById('drop-zone').classList.remove('hidden');
   document.getElementById('upload-progress').classList.add('hidden');
   document.getElementById('upload-preview').classList.add('hidden');
   document.getElementById('upload-image-display').innerHTML = '';
+  document.getElementById('image-toolbar').classList.add('hidden');
+  document.getElementById('pdf-page-nav').classList.add('hidden');
+  document.getElementById('pdf-pages-grid').classList.add('hidden');
   document.getElementById('upload-text').value = '';
   document.getElementById('file-input').value = '';
   uploadedFile = null;
   _uploadMode = 'image';
+  _pdfDoc = null;
+  _pdfPageCanvases = {};
+  _imageRotation = 0;
+  _selectedPages = new Set();
 }
 
 // ── ADD / EDIT FORM ───────────────────────────────────
