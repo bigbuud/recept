@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  recept:
+    image: ghcr.io/bigbuud/recept:latest
+    container_name: receptbox
+    restart: unless-stopped
+    ports:
+      - "3456:3000"           # Pas poort aan naar wens
+    volumes:
+      - /volume1/docker/recept/data:/data
+      - /volume1/docker/recept/uploads:/uploads
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/data/recept.db
+      - UPLOADS_PATH=/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

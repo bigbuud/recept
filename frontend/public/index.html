@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f97316">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ReceptBox">
+  <title>ReceptBox</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar nav -->
+    <nav id="sidebar">
+      <div class="logo">
+        <span class="logo-icon">🍳</span>
+        <span class="logo-text">ReceptBox</span>
+      </div>
+      <ul class="nav-items">
+        <li class="nav-item active" data-page="home">
+          <span class="nav-icon">🏠</span><span>Home</span>
+        </li>
+        <li class="nav-item" data-page="search">
+          <span class="nav-icon">🔍</span><span>Zoeken</span>
+        </li>
+        <li class="nav-item" data-page="roulette">
+          <span class="nav-icon">🎰</span><span>Roulette</span>
+        </li>
+        <li class="nav-item" data-page="upload">
+          <span class="nav-icon">📤</span><span>Uploaden</span>
+        </li>
+        <li class="nav-item" data-page="add">
+          <span class="nav-icon">✏️</span><span>Nieuw recept</span>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <span id="recipe-count">0 recepten</span>
+      </div>
+    </nav>
+
+    <!-- Mobile bottom nav -->
+    <nav id="bottom-nav">
+      <button class="bnav-btn active" data-page="home">🏠<span>Home</span></button>
+      <button class="bnav-btn" data-page="search">🔍<span>Zoeken</span></button>
+      <button class="bnav-btn roulette-btn" data-page="roulette">🎰<span>Roulette</span></button>
+      <button class="bnav-btn" data-page="upload">📤<span>Upload</span></button>
+      <button class="bnav-btn" data-page="add">✏️<span>Nieuw</span></button>
+    </nav>
+
+    <!-- Main content -->
+    <main id="main">
+
+      <!-- ── HOME ── -->
+      <section id="page-home" class="page active">
+        <header class="page-header">
+          <h1>Goedemiddag 👋</h1>
+          <p class="subtitle">Wat staat er vandaag op het menu?</p>
+        </header>
+        <div class="hero-banner">
+          <div class="hero-text">
+            <h2>Wat ga je koken?</h2>
+            <p>Zoek, ontdek of laat de roulette beslissen</p>
+          </div>
+          <div class="hero-buttons">
+            <button class="btn-primary" onclick="navigate('search')">🔍 Zoeken</button>
+            <button class="btn-roulette" onclick="navigate('roulette')">🎰 Verrassing!</button>
+          </div>
+        </div>
+
+        <div class="categories-row">
+          <h3>Categorieën</h3>
+          <div id="categories-grid" class="categories-grid"></div>
+        </div>
+
+        <div class="recent-section">
+          <h3>Recente recepten</h3>
+          <div id="recent-grid" class="recipes-grid"></div>
+          <div id="empty-state" class="empty-state hidden">
+            <div class="empty-icon">🍽️</div>
+            <h3>Nog geen recepten</h3>
+            <p>Voeg je eerste recept toe of upload een bestaand document</p>
+            <button class="btn-primary" onclick="navigate('add')">+ Recept toevoegen</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SEARCH ── -->
+      <section id="page-search" class="page">
+        <header class="page-header">
+          <h1>🔍 Zoeken</h1>
+        </header>
+        <div class="search-bar-wrap">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="Zoek op naam, ingrediënt, tag…" autocomplete="off">
+            <button id="search-clear" class="search-clear hidden">✕</button>
+          </div>
+          <div id="cat-filter-row" class="cat-filter-row"></div>
+        </div>
+        <div id="search-results" class="recipes-grid"></div>
+        <div id="search-empty" class="empty-state hidden">
+          <div class="empty-icon">🤷</div>
+          <h3>Geen resultaten</h3>
+          <p>Probeer een andere zoekterm of categorie</p>
+        </div>
+      </section>
+
+      <!-- ── ROULETTE ── -->
+      <section id="page-roulette" class="page">
+        <header class="page-header">
+          <h1>🎰 Maaltijdroulette</h1>
+          <p class="subtitle">Laat je verrassen!</p>
+        </header>
+        <div class="roulette-container">
+          <div class="roulette-wheel-wrap">
+            <div id="roulette-wheel" class="roulette-wheel">
+              <div class="wheel-inner">
+                <div id="wheel-display" class="wheel-display">
+                  <span class="wheel-emoji">🎲</span>
+                  <span class="wheel-text">Druk op spin!</span>
+                </div>
+              </div>
+            </div>
+            <button id="spin-btn" class="spin-btn" onclick="spinRoulette()">
+              <span class="spin-icon">🎰</span>
+              <span>SPIN!</span>
+            </button>
+          </div>
+          <div class="roulette-filter">
+            <label>Filter op categorie:</label>
+            <div id="roulette-cat-filter" class="cat-filter-row"></div>
+          </div>
+          <div id="roulette-results" class="roulette-results hidden">
+            <h3>Jouw suggesties</h3>
+            <div id="roulette-cards" class="recipes-grid"></div>
+          </div>
+          <div id="roulette-empty" class="empty-state hidden">
+            <div class="empty-icon">😅</div>
+            <h3>Geen recepten beschikbaar</h3>
+            <p>Voeg eerst wat recepten toe!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── UPLOAD ── -->
+      <section id="page-upload" class="page">
+        <header class="page-header">
+          <h1>📤 Recept uploaden</h1>
+          <p class="subtitle">PDF, Word-document of foto</p>
+        </header>
+        <div class="upload-container">
+          <div id="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
+            <div class="drop-icon">📁</div>
+            <h3>Sleep een bestand hierheen</h3>
+            <p>of klik om te bladeren</p>
+            <p class="file-types">PDF • DOCX • JPG • PNG</p>
+            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.webp" hidden>
+          </div>
+          <div id="upload-progress" class="upload-progress hidden">
+            <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+            <p id="progress-text">Bestand verwerken…</p>
+          </div>
+          <div id="upload-preview" class="upload-preview hidden">
+            <div class="preview-header">
+              <span id="preview-filename" class="preview-filename"></span>
+              <button class="btn-sm" onclick="resetUpload()">Opnieuw</button>
+            </div>
+            <div id="preview-image-wrap" class="preview-image-wrap hidden">
+              <img id="preview-image" src="" alt="Recept foto">
+            </div>
+            <div class="form-group">
+              <label>Titel *</label>
+              <input type="text" id="upload-title" placeholder="Naam van het recept">
+            </div>
+            <div class="form-group">
+              <label>Categorie</label>
+              <select id="upload-category"></select>
+            </div>
+            <div class="form-group">
+              <label>Geëxtraheerde tekst (bewerk naar wens)</label>
+              <textarea id="upload-text" rows="8" placeholder="Tekst uit het document…"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Ingrediënten (één per regel)</label>
+              <textarea id="upload-ingredients" rows="5" placeholder="200g bloem&#10;2 eieren&#10;…"></textarea>
+            </div>
+            <button class="btn-primary full-width" onclick="saveUploadedRecipe()">✅ Recept opslaan</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── ADD / EDIT ── -->
+      <section id="page-add" class="page">
+        <header class="page-header">
+          <h1 id="form-title">✏️ Nieuw recept</h1>
+        </header>
+        <form id="recipe-form" class="recipe-form" onsubmit="saveRecipe(event)">
+          <input type="hidden" id="edit-id">
+          <div class="form-group">
+            <label>Titel *</label>
+            <input type="text" id="form-title-input" placeholder="Naam van het recept" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Categorie</label>
+              <select id="form-category"></select>
+            </div>
+            <div class="form-group">
+              <label>Porties</label>
+              <input type="number" id="form-servings" value="4" min="1" max="20">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Bereidingstijd (min)</label>
+              <input type="number" id="form-prep" value="0" min="0">
+            </div>
+            <div class="form-group">
+              <label>Kooktijd (min)</label>
+              <input type="number" id="form-cook" value="0" min="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Omschrijving</label>
+            <textarea id="form-description" rows="2" placeholder="Korte beschrijving…"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Ingrediënten (één per regel)</label>
+            <textarea id="form-ingredients" rows="6" placeholder="200g bloem&#10;2 eieren&#10;100ml melk"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Bereiding</label>
+            <textarea id="form-instructions" rows="8" placeholder="Stap 1: …&#10;Stap 2: …"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Tags (komma-gescheiden)</label>
+            <input type="text" id="form-tags" placeholder="pasta, snel, gezond">
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="cancelEdit()">Annuleer</button>
+            <button type="submit" class="btn-primary">💾 Opslaan</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── DETAIL ── -->
+      <section id="page-detail" class="page">
+        <div id="detail-content"></div>
+      </section>
+
+    </main>
+
+    <!-- Toast notifications -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Overlay spinner -->
+    <div id="spinner" class="spinner hidden">
+      <div class="spinner-inner">🍳</div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
