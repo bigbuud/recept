@@ -262,9 +262,64 @@ async function spinRoulette() {
 
   emptyEl.classList.add('hidden');
   resultsEl.classList.remove('hidden');
-  const grid = document.getElementById('roulette-cards');
-  grid.innerHTML = '';
-  results.forEach((r, i) => grid.appendChild(createRecipeCard(r, i)));
+
+  // Render big winner card
+  renderRouletteWinner(pick, cat);
+
+  // Render alt suggestions (rest of results)
+  const alts = results.slice(1);
+  const altsWrap = document.getElementById('roulette-alts-wrap');
+  const altGrid = document.getElementById('roulette-alt-cards');
+  if (alts.length > 0) {
+    altsWrap.classList.remove('hidden');
+    altGrid.innerHTML = '';
+    alts.forEach((r, i) => {
+      const altCat = categories.find(c => c.id === r.category);
+      const card = document.createElement('div');
+      card.className = 'roulette-alt-card';
+      card.style.animationDelay = `${i * 60 + 100}ms`;
+      card.innerHTML = `
+        <div class="alt-icon">${altCat ? altCat.icon : '🍽️'}</div>
+        <div class="alt-info">
+          <div class="alt-title">${esc(r.title)}</div>
+          <div class="alt-cat">${altCat ? altCat.name : ''}</div>
+        </div>`;
+      card.onclick = () => viewRecipe(r.id);
+      altGrid.appendChild(card);
+    });
+  } else {
+    altsWrap.classList.add('hidden');
+  }
+
+  // Scroll to results
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderRouletteWinner(recipe, cat) {
+  const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const thumbHtml = recipe.image_path
+    ? `<img src="${recipe.image_path}" alt="${esc(recipe.title)}">`
+    : `${cat ? cat.icon : '🍽️'}`;
+
+  document.getElementById('roulette-winner').innerHTML = `
+    <div class="winner-thumb">
+      ${thumbHtml}
+      <div class="winner-badge">🎰 Vandaag koken!</div>
+    </div>
+    <div class="winner-body">
+      <div class="winner-cat">${cat ? `${cat.icon} ${cat.name}` : 'Recept'}</div>
+      <div class="winner-title">${esc(recipe.title)}</div>
+      ${recipe.description ? `<div class="winner-desc">${esc(recipe.description)}</div>` : ''}
+      <div class="winner-meta">
+        ${totalTime ? `<div class="winner-meta-item">⏱ ${totalTime} min</div>` : ''}
+        <div class="winner-meta-item">🍽 ${recipe.servings || 4} porties</div>
+        ${(recipe.tags || []).slice(0,2).map(t => `<div class="winner-meta-item">#${esc(t)}</div>`).join('')}
+      </div>
+      <div class="winner-actions">
+        <button class="btn-primary" onclick="viewRecipe('${recipe.id}')">📖 Bekijk recept</button>
+        <button class="winner-spin-again" onclick="spinRoulette()">🎲 Nog eens spinnen</button>
+      </div>
+    </div>`;
 }
 
 // ── UPLOAD ───────────────────────────────────────────
