@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f97316">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ReceptBox">
+  <title>ReceptBox – Inloggen</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg, #fff7ed 0%, #fef3e2 50%, #fde8d0 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(249,115,22,.15), 0 4px 16px rgba(0,0,0,.06);
+      padding: 40px 36px 36px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .login-logo img {
+      width: 72px; height: 72px;
+      border-radius: 18px;
+      box-shadow: 0 4px 16px rgba(249,115,22,.3);
+    }
+    .login-logo h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      color: #f97316;
+      margin-top: 12px;
+    }
+    .login-logo p {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 6px;
+      letter-spacing: .3px;
+    }
+    .form-group .input-wrap {
+      position: relative;
+    }
+    .form-group .input-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; pointer-events: none;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px 12px 42px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: 'Nunito', sans-serif;
+      color: #1a1a1a;
+      background: #f8fafc;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+    }
+    .form-group input:focus {
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249,115,22,.12);
+      background: #fff;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background: #f97316;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: 'Nunito', sans-serif;
+      cursor: pointer;
+      transition: background .2s, transform .1s, box-shadow .2s;
+      box-shadow: 0 4px 14px rgba(249,115,22,.35);
+      margin-top: 6px;
+    }
+    .login-btn:hover { background: #ea6c0a; box-shadow: 0 6px 20px rgba(249,115,22,.4); }
+    .login-btn:active { transform: scale(.98); }
+    .login-btn:disabled { background: #fdba74; cursor: not-allowed; box-shadow: none; }
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+    .spinner-wrap {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 6px; display: none;
+    }
+    .login-btn.loading .spinner-wrap { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="/icons/icon-192.png" alt="ReceptBox">
+      <h1>ReceptBox</h1>
+      <p>Jouw persoonlijke receptenverzameling</p>
+    </div>
+
+    <div id="error-msg" class="error-msg"></div>
+
+    <div class="form-group">
+      <label for="username">Gebruikersnaam</label>
+      <div class="input-wrap">
+        <span class="input-icon">👤</span>
+        <input type="text" id="username" placeholder="Gebruikersnaam" autocomplete="username" autofocus>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="password">Wachtwoord</label>
+      <div class="input-wrap">
+        <span class="input-icon">🔒</span>
+        <input type="password" id="password" placeholder="Wachtwoord" autocomplete="current-password">
+      </div>
+    </div>
+
+    <button class="login-btn" id="login-btn" onclick="doLogin()">
+      <span class="spinner-wrap"></span>
+      Inloggen
+    </button>
+  </div>
+
+  <script>
+    // Also register SW from login page for installability
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    async function doLogin() {
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('error-msg');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!username || !password) {
+        showError('Vul gebruikersnaam en wachtwoord in.');
+        return;
+      }
+      btn.disabled = true;
+      btn.classList.add('loading');
+      errEl.classList.remove('visible');
+      try {
+        const r = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await r.json();
+        if (r.ok && data.success) {
+          window.location.href = '/';
+        } else {
+          showError(data.error || 'Inloggen mislukt.');
+        }
+      } catch(e) {
+        showError('Verbindingsfout. Probeer opnieuw.');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+      }
+    }
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+  </script>
+</body>
+</html>

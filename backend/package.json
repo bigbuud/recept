@@ -10,6 +10,8 @@
     "mammoth": "^1.7.2",
     "cors": "^2.8.5",
     "uuid": "^9.0.0",
-    "sharp": "^0.33.3"
+    "sharp": "^0.33.3",
+    "express-session": "^1.17.3",
+    "bcryptjs": "^2.4.3"
   }
 }

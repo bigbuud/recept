@@ -6,7 +6,7 @@ services:
     container_name: receptbox
     restart: unless-stopped
     ports:
-      - "3456:3000"           # Pas poort aan naar wens
+      - "3456:3000"           # Intern poort — expose via reverse proxy (Nginx/Traefik)
     volumes:
       - /volume1/docker/recept/data:/data
       - /volume1/docker/recept/uploads:/uploads
@@ -15,8 +15,21 @@ services:
       - PORT=3000
       - DB_PATH=/data/recept.db
       - UPLOADS_PATH=/uploads
+
+      # ── Login instellingen ──────────────────────────────
+      # Verander deze waarden vóór je de container start!
+      - APP_USERNAME=admin
+      - APP_PASSWORD=VeranderMij123!
+
+      # Optioneel: gebruik een bcrypt-hash i.p.v. plain wachtwoord
+      # Genereer: node -e "console.log(require('bcryptjs').hashSync('JouwWachtwoord',12))"
+      # - APP_PASSWORD_HASH=$$2b$$12$$...
+
+      # Sessie-geheim — verander dit naar een lange willekeurige string!
+      - SESSION_SECRET=VeryLongRandomSecretString_VeranderDit_ReceptBox2024
+
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/stats"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
