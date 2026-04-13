@@ -1,5 +1,5 @@
-const CACHE_NAME = 'receptbox-v1';
-const STATIC = ['/', '/manifest.json', '/css/app.css', '/js/app.js'];
+const CACHE_NAME = 'receptbox-v2';
+const STATIC = ['/', '/manifest.json', '/css/app.css', '/js/app.js', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC)));

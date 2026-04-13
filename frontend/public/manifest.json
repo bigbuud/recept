@@ -12,5 +12,21 @@
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "categories": ["food", "lifestyle"],
-  "lang": "nl"
+  "lang": "nl",
+  "shortcuts": [
+    {
+      "name": "Nieuw recept",
+      "short_name": "Nieuw",
+      "description": "Voeg een nieuw recept toe",
+      "url": "/?page=add",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Zoeken",
+      "short_name": "Zoeken",
+      "description": "Zoek een recept",
+      "url": "/?page=search",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

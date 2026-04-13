@@ -11,6 +11,59 @@ let rouletteCategory = 'alle';
 let uploadedFile = null;
 let currentRecipeId = null;
 
+// ── PWA INSTALL PROMPT ────────────────────────────────
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  showInstallBanner();
+});
+
+window.addEventListener('appinstalled', () => {
+  hideInstallBanner();
+  showToast('✅ ReceptBox geïnstalleerd!', 'success');
+});
+
+function showInstallBanner() {
+  if (document.getElementById('install-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'install-banner';
+  banner.className = 'install-banner';
+  banner.innerHTML = `
+    <div class="install-banner-content">
+      <span class="install-banner-icon">📱</span>
+      <div class="install-banner-text">
+        <strong>Installeer ReceptBox</strong>
+        <span>Voeg toe aan je beginscherm</span>
+      </div>
+    </div>
+    <div class="install-banner-btns">
+      <button class="install-btn-yes" onclick="triggerInstall()">Installeren</button>
+      <button class="install-btn-no" onclick="hideInstallBanner()">✕</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.classList.add('visible'), 100);
+}
+
+function hideInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  if (banner) {
+    banner.classList.remove('visible');
+    setTimeout(() => banner.remove(), 400);
+  }
+}
+
+async function triggerInstall() {
+  if (!_deferredInstallPrompt) return;
+  _deferredInstallPrompt.prompt();
+  const { outcome } = await _deferredInstallPrompt.userChoice;
+  _deferredInstallPrompt = null;
+  hideInstallBanner();
+  if (outcome === 'accepted') showToast('✅ ReceptBox geïnstalleerd!', 'success');
+}
+
 // ── INIT ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   registerSW();
@@ -818,6 +871,8 @@ async function viewRecipe(id) {
           <div class="instructions-text">${esc(r.instructions)}</div>
         ` : ''}
         <div class="detail-actions">
+          <button class="btn-share" onclick="shareRecipe(${JSON.stringify(r).replace(/"/g, '&quot;')})">📤 Delen</button>
+          <button class="btn-download" onclick="downloadRecipePdf(${JSON.stringify(r).replace(/"/g, '&quot;')})">⬇️ Download</button>
           <button class="btn-primary" onclick="navigate('add', ${JSON.stringify(r).replace(/"/g, '&quot;')})">✏️ Bewerken</button>
           <button class="btn-danger" onclick="deleteRecipe('${r.id}')">🗑️ Verwijderen</button>
         </div>
@@ -938,4 +993,148 @@ function lbRotate(deg) {
   } else {
     img.style.maxWidth = 'min(100%, 1200px)';
   }
+}
+
+// ── SHARE ─────────────────────────────────────────────
+async function shareRecipe(r) {
+  const cat = categories.find(c => c.id === r.category);
+  const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
+
+  const ingr = (r.ingredients || []).map(i => `• ${i}`).join('\n');
+  const text = [
+    `🍽️ ${r.title}`,
+    cat ? `${cat.icon} ${cat.name}` : '',
+    r.description || '',
+    totalTime ? `⏱ ${totalTime} min  |  🍽 ${r.servings} porties` : `🍽 ${r.servings} porties`,
+    '',
+    ingr ? `🛒 Ingrediënten:\n${ingr}` : '',
+    r.instructions ? `\n👨‍🍳 Bereiding:\n${r.instructions}` : '',
+    r.tags?.length ? `\n🏷️ ${r.tags.join(', ')}` : ''
+  ].filter(Boolean).join('\n');
+
+  // Try native Web Share API first (mobile)
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: r.title,
+        text: text,
+      });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return; // user cancelled
+    }
+  }
+
+  // Fallback: show share sheet modal
+  showShareModal(r, text);
+}
+
+function showShareModal(r, text) {
+  const existing = document.getElementById('share-modal');
+  if (existing) existing.remove();
+
+  const encoded = encodeURIComponent(text);
+  const subject = encodeURIComponent(`Recept: ${r.title}`);
+
+  const modal = document.createElement('div');
+  modal.id = 'share-modal';
+  modal.className = 'share-modal-overlay';
+  modal.innerHTML = `
+    <div class="share-modal" onclick="event.stopPropagation()">
+      <div class="share-modal-header">
+        <h3>📤 Recept delen</h3>
+        <button class="share-close" onclick="document.getElementById('share-modal').remove()">✕</button>
+      </div>
+      <div class="share-grid">
+        <a class="share-option" href="https://wa.me/?text=${encoded}" target="_blank" rel="noopener">
+          <span class="share-opt-icon">💬</span>
+          <span>WhatsApp</span>
+        </a>
+        <a class="share-option" href="mailto:?subject=${subject}&body=${encoded}" target="_blank" rel="noopener">
+          <span class="share-opt-icon">✉️</span>
+          <span>E-mail</span>
+        </a>
+        <a class="share-option" href="sms:?body=${encoded}" target="_blank" rel="noopener">
+          <span class="share-opt-icon">📱</span>
+          <span>SMS</span>
+        </a>
+        <button class="share-option" onclick="copyShareText(${JSON.stringify(text).replace(/"/g,'&quot;')})">
+          <span class="share-opt-icon">📋</span>
+          <span>Kopiëren</span>
+        </button>
+        <button class="share-option" onclick="downloadRecipePdf(${JSON.stringify(r).replace(/"/g,'&quot;')}); document.getElementById('share-modal').remove()">
+          <span class="share-opt-icon">📄</span>
+          <span>PDF</span>
+        </button>
+      </div>
+    </div>
+  `;
+  modal.onclick = () => modal.remove();
+  document.body.appendChild(modal);
+  setTimeout(() => modal.querySelector('.share-modal').classList.add('visible'), 30);
+}
+
+async function copyShareText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('📋 Gekopieerd naar klembord!', 'success');
+    document.getElementById('share-modal')?.remove();
+  } catch {
+    showToast('Kopiëren mislukt', 'error');
+  }
+}
+
+// ── DOWNLOAD AS PDF ────────────────────────────────────
+function downloadRecipePdf(r) {
+  const cat = categories.find(c => c.id === r.category);
+  const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
+  const ingrHtml = (r.ingredients || []).map(i => `<li>${esc(i)}</li>`).join('');
+  const instHtml = (r.instructions || '').replace(/\n/g, '<br>');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>${esc(r.title)}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Nunito', 'Segoe UI', sans-serif; color: #1a1a1a; padding: 40px; max-width: 700px; margin: auto; }
+    .header { border-bottom: 3px solid #f97316; padding-bottom: 16px; margin-bottom: 24px; }
+    .header h1 { font-size: 28px; font-weight: 700; color: #f97316; margin-bottom: 4px; }
+    .cat { font-size: 14px; color: #888; margin-bottom: 8px; }
+    .desc { font-size: 15px; color: #555; margin-bottom: 12px; }
+    .meta { display: flex; gap: 20px; font-size: 13px; color: #666; }
+    .meta span { background: #fef3e2; padding: 4px 10px; border-radius: 20px; }
+    .tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { background: #ffe4cc; color: #c2440f; font-size: 12px; padding: 2px 8px; border-radius: 12px; }
+    .section { margin-top: 28px; }
+    .section h2 { font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #f97316; margin-bottom: 12px; border-bottom: 1px solid #fde8d0; padding-bottom: 6px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; font-size: 15px; line-height: 1.5; }
+    .instructions { font-size: 15px; line-height: 1.8; white-space: pre-wrap; }
+    .footer { margin-top: 40px; font-size: 11px; color: #bbb; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="cat">${cat ? `${cat.icon} ${cat.name}` : 'Recept'}</div>
+    <h1>${esc(r.title)}</h1>
+    ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ''}
+    <div class="meta">
+      ${r.prep_time ? `<span>⏱ Voorber. ${r.prep_time}m</span>` : ''}
+      ${r.cook_time ? `<span>🔥 Koken ${r.cook_time}m</span>` : ''}
+      ${totalTime ? `<span>⏰ Totaal ${totalTime}m</span>` : ''}
+      <span>🍽 ${r.servings} porties</span>
+    </div>
+    ${r.tags?.length ? `<div class="tags">${r.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+  </div>
+  ${ingrHtml ? `<div class="section"><h2>🛒 Ingrediënten</h2><ul>${ingrHtml}</ul></div>` : ''}
+  ${r.instructions ? `<div class="section"><h2>👨‍🍳 Bereiding</h2><div class="instructions">${instHtml}</div></div>` : ''}
+  <div class="footer">ReceptBox • ${new Date().toLocaleDateString('nl-BE')}</div>
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`);
+  win.document.close();
 }
